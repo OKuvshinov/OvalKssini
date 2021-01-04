@@ -70,4 +70,8 @@ public:
 	afx_msg void make_response_coords();
 	afx_msg void formula_square();
 	CEdit FSquare_res;
+	CButton RadioPoly;
+	CButton RadioPoints;
+	afx_msg void OnBnClickedRadio1();
+	afx_msg void OnBnClickedRadio2();
 };

@@ -90,6 +90,8 @@ void CKASSINNIDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_EDIT14, a_cuurent);
 	DDX_Control(pDX, IDC_EDIT15, b_current);
 	DDX_Control(pDX, IDC_EDIT16, FSquare_res);
+	DDX_Control(pDX, IDC_RADIO1, RadioPoly);
+	DDX_Control(pDX, IDC_RADIO2, RadioPoints);
 }
 
 BEGIN_MESSAGE_MAP(CKASSINNIDlg, CDialogEx)
@@ -107,6 +109,8 @@ BEGIN_MESSAGE_MAP(CKASSINNIDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON9, &CKASSINNIDlg::vokrug_ovala)
 	ON_BN_CLICKED(IDC_BUTTON10, &CKASSINNIDlg::make_response_coords)
 	ON_BN_CLICKED(IDC_BUTTON11, &CKASSINNIDlg::formula_square)
+	ON_BN_CLICKED(IDC_RADIO1, &CKASSINNIDlg::OnBnClickedRadio1)
+	ON_BN_CLICKED(IDC_RADIO2, &CKASSINNIDlg::OnBnClickedRadio2)
 END_MESSAGE_MAP()
 
 
@@ -158,13 +162,15 @@ BOOL CKASSINNIDlg::OnInitDialog()
 		cx = rectDraw.Width() / 2;
 		cy = rectDraw.Height() / 2;
 
-		rectDraw.SetRect(cx - 175, cy - 120, cx + 175, cy + 120);
+		rectDraw.SetRect(cx - 177, cy - 163, cx + 177, cy + 163);
 
 		A_slider.SetRange(1, 1000, 1);
 		A_slider.SetPos(500);
 
 		B_Slider.SetRange(1, 1000, 1);
-		B_Slider.SetPos(499);
+		B_Slider.SetPos(550);
+
+		RadioPoly.SetCheck(1);
 
 	}
 
@@ -216,7 +222,7 @@ POINT **AllResDraw;
 
 std::vector<Path> Rotated(1);
 
-std::vector<Path> TwoParts(2);
+std::vector<Paths> TwoParts(1);
 POINT **TwoPartsDraw;
 
 Clipper cp;
@@ -232,6 +238,10 @@ double mult = 10/double(coef); ///////////////
 double form_y_for_oval(double a, double b, double x);
 std::vector<Path> form_dot(double center_x, double center_y);
 void RotatedOval(int Angle, int new_X, int new_Y);
+POINT *make_structure_for_draw(POINT *MyStructure, std::vector<Path> poly);
+POINT **make_structure_for_draw(POINT **MyStructure, std::vector<Paths> poly);
+void draw_points(std::vector<Path> poly, CPaintDC & dc, int r, int SleepTime);
+void draw_points(std::vector<Paths> poly, CPaintDC & dc, int r, int SleepTime);
 
 int number_of_points = 0;
 
@@ -263,6 +273,8 @@ bool OvalFileIndicator = false;
 
 double a, b;
 
+int SleepTime = 0;
+
 void CKASSINNIDlg::OnPaint()
 {
 	if (IsIconic())
@@ -284,36 +296,38 @@ void CKASSINNIDlg::OnPaint()
 	else
 	{
 		CPaintDC dc(this);
+
 		if (ReachIndicator == true) {
 			dc.SelectObject(obolochka);
-			for (int i = 0; i < achieved_poly[0].size(); i++) {
-				dc.Polygon(achieved_poly_draw[i], achieved_poly[0][i].size());
+			if (RadioPoly.GetCheck() == 1) {
+				for (int i = 0; i < achieved_poly[0].size(); i++) {
+					dc.Polygon(achieved_poly_draw[i], achieved_poly[0][i].size());
+				}
 			}
-
-			//for (int i = 0; i < achieved_poly[0].size(); i++) {
-			//	for (int j = 0; j < achieved_poly[0][i].size(); j++) {
-			//		dc.Ellipse(cx + (achieved_poly[0][i][j].X / (coef / 10) - 1), cy - (achieved_poly[0][i][j].Y / (coef / 10) - 1),
-			//			cx + (achieved_poly[0][i][j].X / (coef / 10) + 1), cy - (achieved_poly[0][i][j].Y / (coef / 10) + 1));
-			//		//Sleep(10);
-			//	}
-			//}
+			if (RadioPoints.GetCheck() == 1) {
+				draw_points(achieved_poly, dc, 1, SleepTime);
+			}
 		}
 		dc.SelectObject(oval); //был OvalPen
 		//dc.Rectangle(rectDraw);
 		if (OvalIndicate == true) {
-			dc.Polygon(OvalDraw, Oval[0].size());
+			if (RadioPoly.GetCheck() == 1) {
+				dc.Polygon(OvalDraw, Oval[0].size());
+			}
+			if (RadioPoints.GetCheck() == 1) {
+				draw_points(Rotated, dc, 1, SleepTime);
+			}
 		}
 
 		if (TwoPartsIndicate == true) {
-			for (int i = 0; i < TwoParts.size(); i++) {
-				dc.Polygon(TwoPartsDraw[i], TwoParts[i].size());
+			if (RadioPoly.GetCheck() == 1) {
+				for (int i = 0; i < TwoParts[0].size(); i++) {
+					dc.Polygon(TwoPartsDraw[i], TwoParts[0][i].size());
+				}
 			}
-			//for (int i = 0; i < TwoParts.size(); i++) {
-			//	for (int j = 0; j < TwoParts[i].size(); j++) {
-			//		dc.Ellipse((TwoPartsDraw[i][j].x - 1), TwoPartsDraw[i][j].y - 1, TwoPartsDraw[i][j].x + 1, TwoPartsDraw[i][j].y + 1);
-			//		//Sleep(10);
-			//	}
-			//}
+			if (RadioPoints.GetCheck() == 1) {
+				draw_points(TwoParts, dc, 1, SleepTime);
+			}
 		}
 
 		if (HexIndicator == true) {
@@ -331,9 +345,11 @@ void CKASSINNIDlg::OnPaint()
 
 		dc.SelectObject(FromFilePen);
 		if (OvalFileIndicator == true) {
-			for (int i = 0; i < kass_from_file[0].size(); i++) {
-				dc.Ellipse(cx + (kass_from_file[0][i].X / (coef/10) - 3), cy - (kass_from_file[0][i].Y / (coef/10) - 3),
-					cx + (kass_from_file[0][i].X / (coef/10) + 3), cy - (kass_from_file[0][i].Y / (coef/10) + 3));
+			if (RadioPoly.GetCheck() == 1) {
+				//////////////////////
+			}
+			if (RadioPoints.GetCheck() == 1) {
+				draw_points(kass_from_file, dc, 1, SleepTime);
 			}
 		}
 	}
@@ -370,32 +386,25 @@ void CKASSINNIDlg::DrawOvalCas()
 	RotatedOval(RotAngle.GetPos(), X_Slider.GetPos(), Y_Slider.GetPos());
 
 	if (a > b) {
-		for (int i = 0; i < TwoParts.size(); i++) {
-			TwoParts[i].clear();
+		if (TwoParts[0].size() != 2) {
+			TwoParts[0].resize(2);
+		}
+		for (int i = 0; i < TwoParts[0].size(); i++) {
+			TwoParts[0][i].clear();
 		}
 		for (int i = 0; i < Oval[0].size()*0.25; i++) {
-			TwoParts[0] << IntPoint(Oval[0][i].X, Oval[0][i].Y);
-
+			TwoParts[0][0] << IntPoint(Oval[0][i].X, Oval[0][i].Y);
 		}
+
 		for (int i = Oval[0].size()*0.75; i < Oval[0].size(); i++) {
-			TwoParts[0] << IntPoint(Oval[0][i].X, Oval[0][i].Y);
+			TwoParts[0][0] << IntPoint(Oval[0][i].X, Oval[0][i].Y);
 		}
 
 		for (int i = Oval[0].size()*0.25; i < Oval[0].size()*0.75; i++) {
-			TwoParts[1] << IntPoint(Oval[0][i].X, Oval[0][i].Y);
+			TwoParts[0][1] << IntPoint(Oval[0][i].X, Oval[0][i].Y);
 		}
 
-		TwoPartsDraw = new POINT*[TwoParts.size()];
-		for (int i = 0; i < TwoParts.size(); i++) {
-			TwoPartsDraw[i] = new POINT[TwoParts[i].size()];
-		}
-
-		for (int i = 0; i < TwoParts.size(); i++) {
-			for (int j = 0; j < TwoParts[i].size(); j++) {
-				TwoPartsDraw[i][j].x = cx + mult * TwoParts[i][j].X;
-				TwoPartsDraw[i][j].y = cy - mult * TwoParts[i][j].Y;
-			}
-		}
+		TwoPartsDraw = make_structure_for_draw(TwoPartsDraw, TwoParts);
 
 		OvalIndicate = false;
 		TwoPartsIndicate = true;
@@ -414,14 +423,12 @@ void CKASSINNIDlg::DrawOvalCas()
 void RotatedOval(int Angle, int new_X, int new_Y) {
 
 	Rotated[0].clear();
-	OvalDraw = new POINT[Oval[0].size()];
 	for (int i = 0; i < Oval[0].size(); i++) {
 		Rotated[0] << IntPoint(Oval[0][i].X * cos(Angle*PI / 180) - Oval[0][i].Y * sin(Angle * PI / 180) + new_X,
 			Oval[0][i].X * sin(Angle*PI / 180) + Oval[0][i].Y * cos(Angle * PI / 180) + new_Y);
-
-		OvalDraw[i].x = cx + mult * Rotated[0][i].X;
-		OvalDraw[i].y = cy - mult * Rotated[0][i].Y;
 	}
+
+	OvalDraw = make_structure_for_draw(OvalDraw, Rotated);
 }
 
 double form_y_for_oval(double a, double b, double x) {
@@ -517,16 +524,8 @@ void CKASSINNIDlg::make_net()
 		}
 	}
 
-	OneHexDraw = new POINT*[HexNet[0].size()];
-	for (int i = 0; i < HexNet[0].size(); i++) {
-		OneHexDraw[i] = new POINT[HexNet[0][i].size()];
-	}
-	for (int i = 0; i < HexNet[0].size(); i++) {
-		for (int j = 0; j < HexNet[0][i].size(); j++) {
-			OneHexDraw[i][j].x = cx + mult * HexNet[0][i][j].X;
-			OneHexDraw[i][j].y = cy - mult * HexNet[0][i][j].Y;
-		}
-	}
+	OneHexDraw = make_structure_for_draw(OneHexDraw, HexNet);
+
 	HexIndicator = true;
 	InvalidateRect(rectDraw, 1);
 	OnPaint();
@@ -551,16 +550,8 @@ void CKASSINNIDlg::Clip_it_and_count()
 			AllRes[0] << HexNet[0][i];
 		}
 	}
-	AllResDraw = new POINT*[AllRes[0].size()];
-	for (int i = 0; i < AllRes[0].size(); i++) {
-		AllResDraw[i] = new POINT[AllRes[0][i].size()];
-	}
-	for (int i = 0; i < AllRes[0].size(); i++) {
-		for (int j = 0; j < AllRes[0][i].size(); j++) {
-			AllResDraw[i][j].x = cx + mult * AllRes[0][i][j].X;
-			AllResDraw[i][j].y = cy - mult * AllRes[0][i][j].Y;
-		}
-	}
+
+	AllResDraw = make_structure_for_draw(AllResDraw, AllRes);
 
 	if (number_of_points > max_dots) {
 		MaxCoords[0] = AllRes[0];
@@ -614,9 +605,6 @@ void CKASSINNIDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	// TODO: Add your message handler code here and/or call default
 	CSliderCtrl *pSlider = reinterpret_cast<CSliderCtrl*>(pScrollBar);
 	if (pSlider == &RotAngle) {
-		delete[] OvalDraw;
-		delete[] TwoPartsDraw;
-		delete[] AllResDraw;
 		RotatedOval(RotAngle.GetPos(), X_Slider.GetPos(), Y_Slider.GetPos());
 		Clip_it_and_count();
 		//AfxMessageBox(_T(":)"), MB_ICONINFORMATION);
@@ -627,8 +615,7 @@ void CKASSINNIDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	if (pSlider == &RSize) {
 		X_Slider.SetRange(-1 * R*coef, R*coef, 1);
 		Y_Slider.SetRange(-1 * (0.5*R*sqrt(3)) * coef, (0.5*R*sqrt(3)) * coef, 1);
-		delete[] OneHexDraw;
-		delete[] AllResDraw;
+
 		make_net();
 		Clip_it_and_count();
 		InvalidateRect(rectDraw, 1);
@@ -636,9 +623,6 @@ void CKASSINNIDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		HexIndicator == true;
 	}
 	if (pSlider == &X_Slider || pSlider == &Y_Slider) {
-		delete[] OvalDraw;
-		delete[] TwoPartsDraw;
-		delete[] AllResDraw;
 		RotatedOval(RotAngle.GetPos(), X_Slider.GetPos(), Y_Slider.GetPos());
 		Clip_it_and_count();
 		InvalidateRect(rectDraw, 1);
@@ -646,8 +630,6 @@ void CKASSINNIDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	}
 
 	if (pSlider == &A_slider || pSlider == &B_Slider) {
-		delete[] OvalDraw;
-		delete[] TwoPartsDraw;
 		DrawOvalCas();
 		vokrug_ovala();
 		formula_square();
@@ -663,7 +645,7 @@ void CKASSINNIDlg::analysis()
 	for (int x = X_Slider.GetRangeMin(); x < X_Slider.GetRangeMax() + 1; x++) {
 		for (int y = 0; y < Y_Slider.GetRangeMax() + 1; y++) {
 			for (int angle = 0; angle < 180; angle++) {
-				delete[] OvalDraw;
+
 				delete[] AllResDraw;
 				X_Slider.SetPos(x / 10);
 				Y_Slider.SetPos(y / 10);
@@ -675,6 +657,7 @@ void CKASSINNIDlg::analysis()
 	}
 }
 
+
 void CKASSINNIDlg::oval_from_file()
 {
 	int counter_dim = 0;
@@ -682,7 +665,6 @@ void CKASSINNIDlg::oval_from_file()
 	int error = 0;
 
 	CString fName = _T("");
-
 
 	if (fName == "") {
 		CFileDialog fileDialog(true);	//объект класса выбора файла
@@ -745,6 +727,7 @@ void CKASSINNIDlg::oval_from_file()
 	//AfxMessageBox(fileDialog.GetPathName()); // показать полный путь
 }
 
+
 void CKASSINNIDlg::save_coords_of_max_dots()
 {
 	if (a > b){
@@ -768,6 +751,7 @@ void CKASSINNIDlg::save_coords_of_max_dots()
 	}
 }
 
+
 ClipperOffset co;
 double epsilon = 0.5;
 
@@ -778,8 +762,8 @@ void CKASSINNIDlg::vokrug_ovala()
 	area_kassini_and_achieved = 0;
 
 	if (a > b) {
-		for (int i = 0; i < TwoParts.size(); i++) {
-			co.AddPath(TwoParts[i], jtRound, etClosedPolygon);
+		for (int i = 0; i < TwoParts[0].size(); i++) {
+			co.AddPath(TwoParts[0][i], jtRound, etClosedPolygon);
 		}
 	}
 	else {
@@ -794,17 +778,7 @@ void CKASSINNIDlg::vokrug_ovala()
 	area_kassini_and_achieved /= pow(coef, 2);
 	area_achieved = area_kassini_and_achieved - area_kassini;
 
-	delete[] achieved_poly_draw;
-	achieved_poly_draw = new POINT*[achieved_poly[0].size()];
-	for (int i = 0; i < achieved_poly[0].size(); i++) {
-		achieved_poly_draw[i] = new POINT[achieved_poly[0][i].size()];
-	}
-	for (int i = 0; i < achieved_poly[0].size(); i++) {
-		for (int j = 0; j < achieved_poly[0][i].size(); j++) {
-			achieved_poly_draw[i][j].x = cx + mult * achieved_poly[0][i][j].X;
-			achieved_poly_draw[i][j].y = cy - mult * achieved_poly[0][i][j].Y;
-		}
-	}
+	achieved_poly_draw = make_structure_for_draw(achieved_poly_draw, achieved_poly);
 
 	for_controls.Format(_T("%.2f"), area_kassini);
 	S_Kas.SetWindowTextW(for_controls);
@@ -840,7 +814,6 @@ void CKASSINNIDlg::make_response_coords()
 		for (int i = 0; i < 150; i++) {
 			B_Slider.SetPos(300 + i);
 			//////////////////////сделать для TwoParts
-			delete[] OvalDraw;
 			DrawOvalCas();
 			vokrug_ovala();
 			coords.Format(_T("%.2f %.2f"), double(B_Slider.GetPos() - A_slider.GetPos())/100, area_achieved);
@@ -868,4 +841,65 @@ void CKASSINNIDlg::formula_square()
 
 	for_controls.Format(_T("%.2f"), FSquare);
 	FSquare_res.SetWindowTextW(for_controls);
+}
+
+POINT *make_structure_for_draw(POINT *MyStructure, std::vector<Path> poly)
+{
+	MyStructure = new POINT[poly[0].size()];
+	for (int i = 0; i < poly[0].size(); i++) {
+		MyStructure[i].x = cx + mult * poly[0][i].X;
+		MyStructure[i].y = cy - mult * poly[0][i].Y;
+	}
+	return MyStructure;
+}
+
+
+POINT **make_structure_for_draw(POINT **MyStructure, std::vector<Paths> poly) {
+
+	delete[] MyStructure;
+	MyStructure = new POINT*[poly[0].size()];
+	for (int i = 0; i < poly[0].size(); i++) {
+		MyStructure[i] = new POINT[poly[0][i].size()];
+	}
+	for (int i = 0; i < poly[0].size(); i++) {
+		for (int j = 0; j < poly[0][i].size(); j++) {
+			MyStructure[i][j].x = cx + mult * poly[0][i][j].X;
+			MyStructure[i][j].y = cy - mult * poly[0][i][j].Y;
+		}
+	}
+	return MyStructure;
+}
+
+void draw_points(std::vector<Path> poly, CPaintDC & dc, int r, int SleepTime)
+{
+	for (int i = 0; i < poly[0].size(); i++) {
+		dc.Ellipse(cx + (poly[0][i].X / (coef / 10) - r), cy - (poly[0][i].Y / (coef / 10) - r),
+			cx + (poly[0][i].X / (coef / 10) + r), cy - (poly[0][i].Y / (coef / 10) + r));
+		Sleep(SleepTime);
+	}
+}
+
+void draw_points(std::vector<Paths> poly, CPaintDC & dc, int r, int SleepTime)
+{
+	for (int i = 0; i < poly[0].size(); i++) {
+		for (int j = 0; j < poly[0][i].size(); j++) {
+			dc.Ellipse(cx + (poly[0][i][j].X / (coef / 10) - r), cy - (poly[0][i][j].Y / (coef / 10) - r),
+				cx + (poly[0][i][j].X / (coef / 10) + r), cy - (poly[0][i][j].Y / (coef / 10) + r));
+			Sleep(SleepTime);
+		}
+	}
+}
+
+
+void CKASSINNIDlg::OnBnClickedRadio1()
+{
+	InvalidateRect(rectDraw, 1);
+	OnPaint();
+}
+
+
+void CKASSINNIDlg::OnBnClickedRadio2()
+{
+	InvalidateRect(rectDraw, 1);
+	OnPaint();
 }
